@@ -8,6 +8,22 @@ const DATA_DIR = path.join(process.cwd(), "src", "data");
 let cached: Dataset | null = null;
 
 /**
+ * Fund scheme codes with demonstrably incorrect CAGR data.
+ * These are ICICI Prudential Overnight Fund variants whose 5-year NAV-based
+ * CAGR is wildly wrong (58–67%) because of a calculation artefact.
+ */
+const EXCLUDED_CODES = new Set([145536, 145535, 145538, 145539, 145537, 145547]);
+
+/**
+ * Returns true for Regular Plan funds. Direct plans, ETFs, and unlabelled
+ * funds are kept. We surface only Direct plans to avoid cluttering rankings
+ * with near-duplicate Regular/Direct pairs.
+ */
+function isRegularPlan(name: string): boolean {
+  return /\bregular\b/i.test(name);
+}
+
+/**
  * Load the precomputed dataset. Prefers the real `funds-summary.json` (produced by
  * `npm run build:data`); falls back to the committed sample so the site renders offline.
  */
@@ -22,7 +38,12 @@ export function getDataset(): Dataset {
 }
 
 export function getAllFunds(): FundSummary[] {
-  return getDataset().funds.filter((fund) => hasRecentNav(fund.navDate));
+  return getDataset().funds.filter(
+    (fund) =>
+      hasRecentNav(fund.navDate) &&
+      !EXCLUDED_CODES.has(fund.code) &&
+      !isRegularPlan(fund.name),
+  );
 }
 
 export function getFundByCode(code: number | string): FundSummary | undefined {
@@ -56,12 +77,36 @@ export function rankByPeriod(funds: FundSummary[], period: Period): FundSummary[
   });
 }
 
+export type SortKey = "name" | "nav" | "today" | Period;
+export type SortDir = "asc" | "desc";
+
+/** Generic sort for the fund table. Nulls always go to bottom. */
+export function sortFunds(funds: FundSummary[], key: SortKey, dir: SortDir): FundSummary[] {
+  return [...funds].sort((a, b) => {
+    const av = a[key as keyof FundSummary] as string | number | null;
+    const bv = b[key as keyof FundSummary] as string | number | null;
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (typeof av === "string" && typeof bv === "string") {
+      return dir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+    }
+    const an = av as number;
+    const bn = bv as number;
+    return dir === "asc" ? an - bn : bn - an;
+  });
+}
+
 export interface CategoryInfo {
   slug: string;
   name: string;
   type: string;
   count: number;
 }
+
+/** Broad asset-type groups used as top-level category cloud tabs. */
+export const ASSET_TYPES = ["Equity", "Debt", "Hybrid", "Other", "Solution Oriented"] as const;
+export type AssetType = (typeof ASSET_TYPES)[number];
 
 export function getCategories(): CategoryInfo[] {
   const map = new Map<string, CategoryInfo>();
@@ -71,6 +116,11 @@ export function getCategories(): CategoryInfo[] {
     else map.set(f.categorySlug, { slug: f.categorySlug, name: f.category, type: f.type, count: 1 });
   }
   return [...map.values()].sort((a, b) => b.count - a.count);
+}
+
+/** Subcategories (specific category names) within a given asset type. */
+export function getSubcategories(type: string): CategoryInfo[] {
+  return getCategories().filter((c) => c.type === type);
 }
 
 export function getFundsByCategory(slug: string): FundSummary[] {
