@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IndiaFundCap — Mutual Funds Ranked by Returns</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel:#fafafa;
+    --border:#eaeaea;
+    --text:#1a1a1a;
+    --text-dim:#6b6b6b;
+    --text-faint:#9a9a9a;
+    --accent:#f7941e;
+    --green:#16a34a;
+    --green-bg:#eafaf0;
+    --red:#dc2626;
+    --red-bg:#fdecec;
+    --link:#0b5fc4;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    font-family:'Inter', -apple-system, sans-serif;
+    color:var(--text);
+    background:var(--bg);
+    font-size:14px;
+  }
+  a{ color:inherit; text-decoration:none; }
+
+  /* ---------- Topbar ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 20px;
+    border-bottom:1px solid var(--border);
+    gap:16px; flex-wrap:wrap;
+  }
+  .brand{ display:flex; align-items:center; gap:8px; font-weight:700; font-size:15px; }
+  .brand .mark{ display:flex; align-items:flex-end; gap:1px; height:16px; }
+  .brand .mark span{ width:4px; background:var(--accent); display:inline-block; }
+  .brand .mark span:nth-child(1){ height:40%; }
+  .brand .mark span:nth-child(2){ height:70%; }
+  .brand .mark span:nth-child(3){ height:100%; }
+  .topbar .meta{ font-size:12.5px; color:var(--text-dim); }
+  .topbar .meta b{ color:var(--text); }
+  .topbar-right{ display:flex; align-items:center; gap:10px; margin-left:auto; }
+  .search-box{ position:relative; }
+  .search-box input{
+    border:1px solid var(--border); border-radius:6px;
+    padding:7px 12px 7px 30px; font-size:13px; width:230px;
+    background:#fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="%239a9a9a" stroke-width="2"><circle cx="6" cy="6" r="5"/><line x1="10" y1="10" x2="13" y2="13"/></svg>') no-repeat 10px center;
+    outline:none;
+  }
+  .search-box input:focus{ border-color:var(--accent); }
+  .search-dropdown{
+    position:absolute; top:calc(100% + 4px); right:0; width:320px;
+    background:#fff; border:1px solid var(--border); border-radius:8px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.08);
+    max-height:320px; overflow-y:auto; z-index:50;
+  }
+  .search-dropdown .item{
+    padding:9px 12px; font-size:13px; cursor:pointer; border-bottom:1px solid var(--border);
+    display:flex; justify-content:space-between; gap:8px;
+  }
+  .search-dropdown .item:last-child{ border-bottom:none; }
+  .search-dropdown .item:hover{ background:var(--panel); }
+  .search-dropdown .item .code{ color:var(--text-faint); font-size:11px; white-space:nowrap; }
+  .search-dropdown .empty, .search-dropdown .loading{ padding:12px; color:var(--text-dim); font-size:12.5px; }
+
+  /* ---------- Header ---------- */
+  .page-head{ text-align:center; padding:26px 20px 6px; }
+  .page-head h1{ font-size:24px; margin:0 0 6px; font-weight:700; }
+  .page-head .sub{ font-size:13px; color:var(--text-dim); }
+  .page-head .sub b{ color:var(--text); }
+
+  /* ---------- Controls ---------- */
+  .controls{
+    display:flex; align-items:center; justify-content:center;
+    gap:8px; padding:18px 20px 10px; flex-wrap:wrap;
+  }
+  .controls .label{ font-size:12.5px; color:var(--text-dim); margin-right:4px; }
+  .tab{
+    border:1px solid var(--border); background:#fff; border-radius:20px;
+    padding:6px 14px; font-size:12.5px; cursor:pointer; color:var(--text-dim);
+    font-weight:500;
+  }
+  .tab:hover{ border-color:var(--accent); color:var(--text); }
+  .tab.active{ background:var(--text); color:#fff; border-color:var(--text); }
+  select.cat-filter{
+    border:1px solid var(--border); border-radius:20px; padding:6px 12px;
+    font-size:12.5px; color:var(--text-dim); background:#fff; font-family:inherit;
+  }
+
+  .scope-note{
+    text-align:center; font-size:11.5px; color:var(--text-faint);
+    max-width:640px; margin:0 auto 14px; line-height:1.5;
+    padding:0 20px;
+  }
+
+  /* ---------- Table ---------- */
+  .table-wrap{ max-width:1180px; margin:0 auto; padding:0 20px 30px; overflow-x:auto; }
+  table{ width:100%; border-collapse:collapse; min-width:920px; }
+  thead th{
+    background:var(--panel); border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+    text-align:right; font-size:11.5px; color:var(--text-dim); font-weight:600;
+    padding:10px 10px; white-space:nowrap; cursor:pointer; user-select:none;
+  }
+  thead th:hover{ color:var(--text); }
+  thead th.left{ text-align:left; }
+  thead th.rank-col{ width:44px; text-align:center; cursor:default; }
+  thead th.star-col{ width:30px; cursor:default; }
+  thead th.left:first-of-type{ cursor:default; }
+  thead th .arrow{ margin-left:3px; color:var(--accent); }
+
+  tbody tr{ border-bottom:1px solid var(--border); }
+  tbody tr:hover{ background:#fbfbfb; }
+  tbody td{ padding:11px 10px; font-size:13.5px; text-align:right; white-space:nowrap; vertical-align:middle; }
+  td.rank-col{ text-align:center; color:var(--text-dim); font-weight:500; }
+  td.star-col{ text-align:center; }
+  .star-btn{ background:none; border:none; cursor:pointer; font-size:15px; color:#d7d7d7; padding:0; }
+  .star-btn.active{ color:var(--accent); }
+
+  td.name-col{ text-align:left; }
+  .fund-row{ display:flex; align-items:center; gap:10px; }
+  .avatar{
+    width:30px; height:30px; border-radius:50%; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; font-weight:700; font-size:12px;
+  }
+  .fund-names{ min-width:0; }
+  .fund-name{ font-weight:500; color:var(--text); white-space:normal; line-height:1.25; font-size:13px; }
+  .fund-house{ font-size:11px; color:var(--text-faint); margin-top:1px; }
+
+  td.cat-col{ text-align:left; color:var(--text-dim); font-size:12px; white-space:normal; max-width:130px; }
+
+  .pill{ display:inline-block; padding:3px 8px; border-radius:5px; font-size:12.5px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .pill.up{ color:var(--green); background:var(--green-bg); }
+  .pill.down{ color:var(--red); background:var(--red-bg); }
+  .pill.na{ color:var(--text-faint); background:transparent; font-weight:400; }
+
+  .nav-val{ font-variant-numeric:tabular-nums; color:var(--text); }
+
+  td.spark-col{ width:100px; }
+  .skeleton{ display:inline-block; height:12px; width:44px; border-radius:3px; background:linear-gradient(90deg,#eee,#f5f5f5,#eee); background-size:200% 100%; animation:shimmer 1.3s infinite; }
+  @keyframes shimmer{ 0%{ background-position:200% 0;} 100%{ background-position:-200% 0;} }
+
+  .empty-state, .loading-state{ text-align:center; padding:50px 20px; color:var(--text-dim); font-size:13.5px; }
+
+  /* ---------- Pagination ---------- */
+  .pagination{
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    padding:20px; flex-wrap:wrap;
+  }
+  .pagination button{
+    border:1px solid var(--border); background:#fff; border-radius:6px;
+    padding:6px 11px; font-size:12.5px; cursor:pointer; color:var(--text-dim); font-family:inherit;
+  }
+  .pagination button:hover:not(:disabled){ border-color:var(--accent); color:var(--text); }
+  .pagination button.active{ background:var(--text); color:#fff; border-color:var(--text); }
+  .pagination button:disabled{ opacity:0.35; cursor:default; }
+  .pagination .ellipsis{ color:var(--text-faint); padding:0 4px; }
+
+  .footer-note{
+    max-width:1180px; margin:0 auto; padding:0 20px 50px;
+    font-size:11.5px; color:var(--text-faint); line-height:1.6; text-align:center;
+  }
+  .footer-note a{ color:var(--link); text-decoration:underline; }
+
+  @media (max-width:640px){
+    .topbar-right{ width:100%; justify-content:flex-start; }
+    .search-box input{ width:100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand"><span class="mark"><span></span><span></span><span></span></span> IndiaFundCap</div>
+  <div class="meta" id="topbar-meta">Schemes: <b>—</b> · loading live universe…</div>
+  <div class="topbar-right">
+    <div class="search-box">
+      <input type="text" id="search-input" placeholder="Fund name...">
+      <div class="search-dropdown" id="search-dropdown" hidden></div>
+    </div>
+  </div>
+</div>
+
+<div class="page-head">
+  <h1>Largest Indian Mutual Funds by Returns</h1>
+  <div class="sub">Schemes: <b id="sub-count">—</b> · CAGR computed live from daily NAV history</div>
+</div>
+
+<div class="controls">
+  <span class="label">Rank by</span>
+  <button class="tab active" data-metric="none">Default</button>
+  <button class="tab" data-metric="today">Today</button>
+  <button class="tab" data-metric="y1">1Y</button>
+  <button class="tab" data-metric="y3">3Y</button>
+  <button class="tab" data-metric="y5">5Y</button>
+  <button class="tab" data-metric="y10">10Y</button>
+  <select class="cat-filter" id="cat-filter">
+    <option value="">All categories</option>
+  </select>
+</div>
+
+<p class="scope-note" id="scope-note">
+  Loading the full scheme universe from MFapi.in for pagination — CAGR and NAV values are then fetched live per page (100 schemes at a time), so "Rank by" sorts only the schemes currently on screen, not the entire universe.
+</p>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th class="rank-col">#</th>
+        <th class="star-col"></th>
+        <th class="left">Fund</th>
+        <th class="left">Category</th>
+        <th>NAV</th>
+        <th data-key="today">Today</th>
+        <th data-key="y1">1Y</th>
+        <th data-key="y3">3Y</th>
+        <th data-key="y5">5Y</th>
+        <th data-key="y10">10Y</th>
+        <th>30D Trend</th>
+      </tr>
+    </thead>
+    <tbody id="table-body">
+      <tr><td colspan="11" class="loading-state">Fetching the scheme list…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="pagination" id="pagination"></div>
+
+<p class="footer-note">
+  Data sourced live in your browser from <a href="https://www.mfapi.in" target="_blank" rel="noopener">MFapi.in</a>, a free public API for Indian mutual fund NAVs. NAV and CAGR figures reflect growth-plan history only (dividends/loads not included) and are not investment advice. This page makes a live API request per visible scheme — open it as a regular local/hosted webpage (not inside a sandboxed preview) for fetches to succeed.
+</p>
+
+<script>
+(function(){
+  const API = "https://api.mfapi.in";
+  const PAGE_SIZE = 100;
+  const PERIODS = [1,3,5,10];
+  const CONCURRENCY = 6;
+
+  let allSchemes = [];      // {schemeCode, schemeName}
+  let filteredSchemes = []; // after category/search filter (category filter needs detail fetched, so applied post-hoc per page)
+  let currentPage = 1;
+  let pageData = {};        // schemeCode -> computed detail, cached across pages
+  let sortMetric = 'none';
+  let sortDir = -1;
+  let categorySet = new Set();
+
+  const tbody = document.getElementById('table-body');
+  const paginationEl = document.getElementById('pagination');
+  const topbarMeta = document.getElementById('topbar-meta');
+  const subCount = document.getElementById('sub-count');
+  const catFilter = document.getElementById('cat-filter');
+
+  const AVATAR_COLORS = ['#f7941e','#0b5fc4','#16a34a','#dc2626','#7c3aed','#0891b2','#ca8a04','#db2777'];
+  function colorFor(str){
+    let h = 0;
+    for(let i=0;i<str.length;i++) h = str.charCodeAt(i) + ((h<<5)-h);
+    return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+  }
+  function houseName(schemeName){
+    return schemeName.split(' ')[0];
+  }
+
+  function parseDate(d){ const [dd,mm,yyyy]=d.split('-').map(Number); return new Date(yyyy,mm-1,dd); }
+
+  function computeDetail(meta, data){
+    const sorted = [...data].sort((a,b)=> parseDate(b.date)-parseDate(a.date));
+    const latest = sorted[0], prev = sorted[1];
+    const latestNav = latest ? parseFloat(latest.nav) : null;
+    const prevNav = prev ? parseFloat(prev.nav) : null;
+    const today = (latestNav && prevNav) ? ((latestNav/prevNav)-1)*100 : null;
+
+    const cagr = {};
+    if(latest){
+      const latestDate = parseDate(latest.date);
+      PERIODS.forEach(years=>{
+        const target = new Date(latestDate); target.setFullYear(target.getFullYear()-years);
+        let match = null;
+        for(const entry of sorted){ if(parseDate(entry.date) <= target){ match = entry; break; } }
+        if(!match){ cagr['y'+years] = null; return; }
+        const startNav = parseFloat(match.nav);
+        cagr['y'+years] = (startNav && latestNav) ? (Math.pow(latestNav/startNav, 1/years)-1)*100 : null;
+      });
+    }
+
+    const spark = sorted.slice(0,30).reverse().map(e=>parseFloat(e.nav));
+
+    return {
+      name: meta.scheme_name,
+      category: (meta.scheme_category||'').replace('Open Ended Schemes','').replace(/^\s*-\s*/,'').trim() || '—',
+      latestNav, today, cagr, spark
+    };
+  }
+
+  function fmtPill(v){
+    if(v===null||v===undefined||Number.isNaN(v)) return '<span class="pill na">—</span>';
+    const cls = v>=0?'up':'down';
+    return `<span class="pill ${cls}">${v>=0?'+':''}${v.toFixed(2)}%</span>`;
+  }
+
+  function sparkSvg(points){
+    if(!points || points.length<2) return '';
+    const w=90,h=28,pad=2;
+    const min=Math.min(...points), max=Math.max(...points);
+    const range = (max-min)||1;
+    const step = (w-pad*2)/(points.length-1);
+    const pts = points.map((v,i)=> `${(pad+i*step).toFixed(1)},${(h-pad-((v-min)/range)*(h-pad*2)).toFixed(1)}`).join(' ');
+    const up = points[points.length-1] >= points[0];
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="${up?'#16a34a':'#dc2626'}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+  }
+
+  // ---------- fetch full scheme universe ----------
+  async function loadUniverse(){
+    try{
+      const res = await fetch(`${API}/mf`);
+      const json = await res.json();
+      allSchemes = json;
+      filteredSchemes = allSchemes;
+      topbarMeta.innerHTML = `Schemes: <b>${allSchemes.length.toLocaleString('en-IN')}</b> · live from MFapi.in`;
+      subCount.textContent = allSchemes.length.toLocaleString('en-IN');
+      renderPagination();
+      loadPage(1);
+    }catch(err){
+      tbody.innerHTML = `<tr><td colspan="11" class="empty-state">Could not load the scheme list. If you're viewing this inside a sandboxed preview, download the file and open it directly in your browser instead — the live API call needs a normal page context.</td></tr>`;
+      topbarMeta.textContent = 'Could not reach MFapi.in';
+    }
+  }
+
+  // ---------- concurrency-limited fetch of page detail ----------
+  async function asyncPool(items, worker, limit){
+    const ret = [];
+    const executing = new Set();
+    for(const item of items){
+      const p = worker(item).then(r=>{ executing.delete(p); return r; });
+      ret.push(p); executing.add(p);
+      if(executing.size >= limit) await Promise.race(executing);
+    }
+    return Promise.all(ret);
+  }
+
+  async function loadPage(page){
+    currentPage = page;
+    const start = (page-1)*PAGE_SIZE;
+    const pageItems = filteredSchemes.slice(start, start+PAGE_SIZE);
+    renderTable(pageItems, true);
+    renderPagination();
+
+    await asyncPool(pageItems, async (item)=>{
+      if(pageData[item.schemeCode]){ return; }
+      try{
+        const res = await fetch(`${API}/mf/${item.schemeCode}`);
+        const json = await res.json();
+        if(json.status === 'SUCCESS' && json.data && json.data.length){
+          const detail = computeDetail(json.meta, json.data);
+          pageData[item.schemeCode] = detail;
+          if(detail.category) categorySet.add(detail.category);
+          updateCategoryOptions();
+        }else{
+          pageData[item.schemeCode] = { failed:true };
+        }
+      }catch(e){
+        pageData[item.schemeCode] = { failed:true };
+      }
+      // progressive render only if still on same page
+      if(currentPage === page) renderTable(filteredSchemes.slice(start,start+PAGE_SIZE), false);
+    }, CONCURRENCY);
+  }
+
+  function updateCategoryOptions(){
+    const existing = new Set(Array.from(catFilter.options).map(o=>o.value));
+    categorySet.forEach(c=>{
+      if(!existing.has(c)){
+        const opt = document.createElement('option');
+        opt.value = c; opt.textContent = c;
+        catFilter.appendChild(opt);
+      }
+    });
+  }
+
+  function renderTable(pageItems, initial){
+    const start = (currentPage-1)*PAGE_SIZE;
+    let rows = pageItems.map((item, i)=>({ item, rank: start+i+1, detail: pageData[item.schemeCode] }));
+
+    const activeCat = catFilter.value;
+    if(activeCat){
+      rows = rows.filter(r=> r.detail && !r.detail.failed && r.detail.category === activeCat);
+    }
+
+    if(sortMetric !== 'none'){
+      rows.sort((a,b)=>{
+        const av = a.detail && !a.detail.failed ? (sortMetric==='today'? a.detail.today : a.detail.cagr[sortMetric]) : null;
+        const bv = b.detail && !b.detail.failed ? (sortMetric==='today'? b.detail.today : b.detail.cagr[sortMetric]) : null;
+        if(av===null||av===undefined) return 1;
+        if(bv===null||bv===undefined) return -1;
+        return (av-bv)*sortDir;
+      });
+    }
+
+    if(!rows.length){
+      tbody.innerHTML = `<tr><td colspan="11" class="empty-state">${initial? 'Loading schemes…' : 'No schemes match this filter on the current page.'}</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = rows.map(r=>{
+      const d = r.detail;
+      const loading = !d;
+      const failed = d && d.failed;
+      const name = loading ? r.item.schemeName : (failed ? r.item.schemeName : d.name);
+      const house = houseName(r.item.schemeName);
+      const col = colorFor(house);
+
+      return `
+        <tr>
+          <td class="rank-col">${r.rank}</td>
+          <td class="star-col"><button class="star-btn" data-code="${r.item.schemeCode}">★</button></td>
+          <td class="name-col">
+            <div class="fund-row">
+              <div class="avatar" style="background:${col}">${house.slice(0,2).toUpperCase()}</div>
+              <div class="fund-names">
+                <div class="fund-name">${name}</div>
+                <div class="fund-house">${house} · #${r.item.schemeCode}</div>
+              </div>
+            </div>
+          </td>
+          <td class="cat-col">${loading?'<span class="skeleton"></span>': (failed?'—':d.category)}</td>
+          <td>${loading?'<span class="skeleton"></span>':(failed?'—':'<span class="nav-val">₹'+(d.latestNav?d.latestNav.toFixed(2):'—')+'</span>')}</td>
+          <td>${loading?'<span class="skeleton"></span>':(failed?'—':fmtPill(d.today))}</td>
+          <td>${loading?'<span class="skeleton"></span>':(failed?'—':fmtPill(d.cagr.y1))}</td>
+          <td>${loading?'<span class="skeleton"></span>':(failed?'—':fmtPill(d.cagr.y3))}</td>
+          <td>${loading?'<span class="skeleton"></span>':(failed?'—':fmtPill(d.cagr.y5))}</td>
+          <td>${loading?'<span class="skeleton"></span>':(failed?'—':fmtPill(d.cagr.y10))}</td>
+          <td class="spark-col">${loading?'':(failed?'—':sparkSvg(d.spark))}</td>
+        </tr>
+      `;
+    }).join('');
+
+    tbody.querySelectorAll('.star-btn').forEach(btn=>{
+      btn.addEventListener('click', ()=> btn.classList.toggle('active'));
+    });
+  }
+
+  function renderPagination(){
+    const totalPages = Math.max(1, Math.ceil(filteredSchemes.length / PAGE_SIZE));
+    let html = '';
+    html += `<button ${currentPage===1?'disabled':''} data-page="prev">← Prev</button>`;
+
+    const pages = new Set([1, totalPages, currentPage, currentPage-1, currentPage+1]);
+    let last = 0;
+    Array.from(pages).filter(p=>p>=1 && p<=totalPages).sort((a,b)=>a-b).forEach(p=>{
+      if(last && p - last > 1) html += `<span class="ellipsis">…</span>`;
+      html += `<button class="${p===currentPage?'active':''}" data-page="${p}">${p}</button>`;
+      last = p;
+    });
+
+    html += `<button ${currentPage===totalPages?'disabled':''} data-page="next">Next →</button>`;
+    paginationEl.innerHTML = html;
+
+    paginationEl.querySelectorAll('button[data-page]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const val = btn.dataset.page;
+        let target = currentPage;
+        if(val==='prev') target = currentPage-1;
+        else if(val==='next') target = currentPage+1;
+        else target = parseInt(val,10);
+        if(target>=1 && target<=totalPages && target!==currentPage){
+          loadPage(target);
+          window.scrollTo({top:0, behavior:'smooth'});
+        }
+      });
+    });
+  }
+
+  // ---------- rank-by tabs ----------
+  document.querySelectorAll('.tab').forEach(tab=>{
+    tab.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      tab.classList.add('active');
+      sortMetric = tab.dataset.metric;
+      sortDir = -1;
+      renderTable(filteredSchemes.slice((currentPage-1)*PAGE_SIZE, currentPage*PAGE_SIZE), false);
+    });
+  });
+
+  document.querySelectorAll('th[data-key]').forEach(th=>{
+    th.addEventListener('click', ()=>{
+      const key = th.dataset.key;
+      document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.metric===key));
+      if(sortMetric===key) sortDir *= -1; else { sortMetric = key; sortDir = -1; }
+      renderTable(filteredSchemes.slice((currentPage-1)*PAGE_SIZE, currentPage*PAGE_SIZE), false);
+    });
+  });
+
+  catFilter.addEventListener('change', ()=>{
+    renderTable(filteredSchemes.slice((currentPage-1)*PAGE_SIZE, currentPage*PAGE_SIZE), false);
+  });
+
+  // ---------- search ----------
+  const searchInput = document.getElementById('search-input');
+  const searchDropdown = document.getElementById('search-dropdown');
+  let searchTimer = null;
+
+  searchInput.addEventListener('input', ()=>{
+    const q = searchInput.value.trim().toLowerCase();
+    clearTimeout(searchTimer);
+    if(q.length < 2){ searchDropdown.hidden = true; return; }
+    searchTimer = setTimeout(()=>{
+      const matches = allSchemes.filter(s=> s.schemeName.toLowerCase().includes(q)).slice(0,12);
+      searchDropdown.hidden = false;
+      if(!matches.length){
+        searchDropdown.innerHTML = '<div class="empty">No matches.</div>';
+        return;
+      }
+      searchDropdown.innerHTML = matches.map(m=>`
+        <div class="item" data-code="${m.schemeCode}">
+          <span>${m.schemeName}</span><span class="code">#${m.schemeCode}</span>
+        </div>
+      `).join('');
+      searchDropdown.querySelectorAll('.item').forEach(el=>{
+        el.addEventListener('click', ()=>{
+          const code = el.dataset.code;
+          const idx = allSchemes.findIndex(s=>String(s.schemeCode)===String(code));
+          if(idx>-1){
+            const targetPage = Math.floor(idx/PAGE_SIZE)+1;
+            loadPage(targetPage);
+          }
+          searchDropdown.hidden = true;
+          searchInput.value = '';
+        });
+      });
+    }, 250);
+  });
+
+  document.addEventListener('click', (e)=>{
+    if(!e.target.closest('.search-box')) searchDropdown.hidden = true;
+  });
+
+  loadUniverse();
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: theme("colors.bg");
+  color: theme("colors.ink");
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Prose defaults for MDX guide content */
+.prose h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 28px 0 10px;
+}
+.prose h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 22px 0 8px;
+}
+.prose p,
+.prose li {
+  font-size: 15px;
+  line-height: 1.7;
+  color: #333;
+}
+.prose ul {
+  margin: 10px 0;
+  padding-left: 20px;
+  list-style: disc;
+}
+.prose a {
+  color: theme("colors.link");
+  text-decoration: underline;
+}
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 14px;
+}
+.prose th,
+.prose td {
+  border: 1px solid theme("colors.border");
+  padding: 8px 10px;
+  text-align: left;
+}
