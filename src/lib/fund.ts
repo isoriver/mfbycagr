@@ -1,5 +1,5 @@
 import { getScheme } from "./mfapi";
-import { computeReturns, parseNavDate } from "./returns";
+import { computeReturns, splitAdjustedSeries } from "./returns";
 import { getFundByCode } from "./dataset";
 import { cleanCategory, slugify, assetType, deriveHouse } from "./slug";
 import type { FundSummary } from "./types";
@@ -29,33 +29,31 @@ export async function resolveFund(code: string | number): Promise<ResolvedFund |
     const detail = await getScheme(code);
     if (detail?.data?.length) {
       const r = computeReturns(detail.data);
-      const category = cleanCategory(detail.meta.scheme_category);
-      const house = deriveHouse(detail.meta.scheme_name || existing?.name || "", detail.meta.fund_house);
+      const schemeName = detail.meta.scheme_name || existing?.name || `Scheme #${code}`;
+      const category = cleanCategory(detail.meta.scheme_category, schemeName);
+      const house = deriveHouse(schemeName, detail.meta.fund_house);
       const summary: FundSummary = {
         code: Number(code),
-        name: detail.meta.scheme_name || existing?.name || `Scheme #${code}`,
+        name: schemeName,
         house,
         houseSlug: slugify(house),
         category,
         categorySlug: slugify(category),
-        type: assetType(detail.meta.scheme_category, detail.meta.scheme_type),
+        type: assetType(detail.meta.scheme_category, detail.meta.scheme_type, schemeName),
         nav: r.latestNav,
         navDate: r.latestDate,
         today: r.today,
+        m1: r.m1,
+        m6: r.m6,
         y1: r.cagr.y1,
         y3: r.cagr.y3,
         y5: r.cagr.y5,
         y10: r.cagr.y10,
         spark: r.spark,
       };
-      const navHistory = detail.data
-        .map((d) => ({ date: d.date, nav: parseFloat(d.nav), timestamp: parseNavDate(d.date)?.getTime() }))
-        .filter((d): d is { date: string; nav: number; timestamp: number } =>
-          Number.isFinite(d.nav) && d.timestamp != null,
-        )
-        .sort((a, b) => a.timestamp - b.timestamp)
-        .map(({ date, nav }) => ({ date, nav }));
-      return { summary, navHistory: downsample(navHistory, 200) };
+      // Split-adjusted so the chart is continuous across re-denominations (no fake cliff).
+      const navHistory = splitAdjustedSeries(detail.data);
+      return { summary, navHistory: downsample(navHistory, 500) };
     }
   } catch {
     /* fall through to dataset */

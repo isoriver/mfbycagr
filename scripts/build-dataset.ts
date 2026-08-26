@@ -19,6 +19,7 @@ import path from "node:path";
 import { computeReturns } from "../src/lib/returns.ts";
 import { cleanCategory, slugify, assetType, deriveHouse } from "../src/lib/slug.ts";
 import { hasRecentNav } from "../src/lib/freshness.ts";
+import { isRankableName, isPlausibleCagr, isPlausibleShortReturn } from "../src/lib/eligibility.ts";
 import type { FundSummary, SchemeListItem, SchemeDetail, Dataset } from "../src/lib/types.ts";
 
 const BASE = process.env.MFAPI_BASE || "https://api.mfapi.in";
@@ -61,10 +62,12 @@ function sleep(ms: number) {
 
 function toSummary(code: number, detail: SchemeDetail, fallbackName: string): FundSummary | null {
   if (!detail?.data?.length) return null;
+  const name = detail.meta.scheme_name || fallbackName || `Scheme #${code}`;
+  // Rank Direct-plan Growth options only — drop Regular plans and IDCW/Dividend variants.
+  if (!isRankableName(name)) return null;
   const r = computeReturns(detail.data);
   if (r.latestNav == null) return null;
-  const name = detail.meta.scheme_name || fallbackName || `Scheme #${code}`;
-  const category = cleanCategory(detail.meta.scheme_category);
+  const category = cleanCategory(detail.meta.scheme_category, name);
   const house = deriveHouse(name, detail.meta.fund_house);
   return {
     code,
@@ -73,14 +76,16 @@ function toSummary(code: number, detail: SchemeDetail, fallbackName: string): Fu
     houseSlug: slugify(house),
     category,
     categorySlug: slugify(category),
-    type: assetType(detail.meta.scheme_category, detail.meta.scheme_type),
+    type: assetType(detail.meta.scheme_category, detail.meta.scheme_type, name),
     nav: r.latestNav,
     navDate: r.latestDate,
     today: r.today,
-    y1: r.cagr.y1,
-    y3: r.cagr.y3,
-    y5: r.cagr.y5,
-    y10: r.cagr.y10,
+    m1: isPlausibleShortReturn("m1", r.m1) ? r.m1 : null,
+    m6: isPlausibleShortReturn("m6", r.m6) ? r.m6 : null,
+    y1: isPlausibleCagr("y1", r.cagr.y1) ? r.cagr.y1 : null,
+    y3: isPlausibleCagr("y3", r.cagr.y3) ? r.cagr.y3 : null,
+    y5: isPlausibleCagr("y5", r.cagr.y5) ? r.cagr.y5 : null,
+    y10: isPlausibleCagr("y10", r.cagr.y10) ? r.cagr.y10 : null,
     spark: r.spark,
   };
 }

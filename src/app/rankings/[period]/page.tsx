@@ -1,15 +1,19 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getAllFunds, rankByPeriod, paginate, PERIOD_SLUGS, PERIOD_LABELS } from "@/lib/dataset";
+import { getAllFunds, rankByPeriod, paginate, parsePage, PERIOD_SLUGS, PERIOD_LABELS } from "@/lib/dataset";
 import { FundTable } from "@/components/FundTable";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Pagination } from "@/components/Pagination";
 import { StructuredData } from "@/components/StructuredData";
-import { pageMetadata, breadcrumbJsonLd, itemListJsonLd } from "@/lib/seo";
+import { ListingIntro, ListingFaq } from "@/components/ListingIntro";
+import { rankingsIntro, rankingsFaqs } from "@/content/listingCopy";
+import { listPageMetadata, breadcrumbJsonLd, itemListJsonLd, faqJsonLd } from "@/lib/seo";
 
 export const revalidate = 86400;
 export const dynamicParams = false;
+
+const PAGE_SIZE = 50;
 
 export function generateStaticParams() {
   return Object.keys(PERIOD_SLUGS).map((period) => ({ period }));
@@ -20,13 +24,20 @@ function resolve(periodSlug: string) {
   return period ? { period, label: PERIOD_LABELS[period] } : null;
 }
 
-export function generateMetadata({ params }: { params: { period: string } }): Metadata {
+export function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: { period: string };
+  searchParams: { page?: string };
+}): Metadata {
   const r = resolve(params.period);
   if (!r) return {};
-  return pageMetadata({
+  return listPageMetadata({
     title: `Top Indian Mutual Funds by ${r.label} CAGR`,
     description: `The best-performing Indian mutual funds ranked by ${r.label} compounded annual growth rate (CAGR), computed from official NAV history and updated daily.`,
     path: `/rankings/${params.period}`,
+    page: parsePage(searchParams.page),
   });
 }
 
@@ -42,13 +53,17 @@ export default function RankingsPage({
   const r = resolve(params.period);
   if (!r) notFound();
 
-  const page = Math.max(1, parseInt(searchParams.page || "1", 10) || 1);
+  const page = parsePage(searchParams.page);
   const ranked = rankByPeriod(getAllFunds(), r.period);
-  const pageData = paginate(ranked, page, 50);
+  const pageData = paginate(ranked, page, PAGE_SIZE);
+
+  const withData = ranked.filter((f) => f[r.period] != null);
+  const intro = rankingsIntro(r.label, withData.length, withData[0] ?? null);
+  const faqs = rankingsFaqs(r.label, withData.length);
 
   const crumbs = [
     { name: "Home", path: "/" },
-    { name: "Rankings", path: "/rankings/5y" },
+    { name: "Rankings", path: "/rankings" },
     { name: `${r.label} CAGR`, path: `/rankings/${params.period}` },
   ];
 
@@ -58,15 +73,17 @@ export default function RankingsPage({
         data={[
           breadcrumbJsonLd(crumbs),
           itemListJsonLd(`Top Indian mutual funds by ${r.label} CAGR`, pageData.items),
+          faqJsonLd(faqs),
         ]}
       />
       <Breadcrumbs crumbs={crumbs} />
 
-      <div className="mx-auto max-w-content px-5 pb-2 pt-2">
+      <div className="mx-auto max-w-content px-4 pb-2 pt-2 sm:px-5">
         <h1 className="text-[24px] font-bold">Top Indian Mutual Funds by {r.label} CAGR</h1>
-        <p className="mt-2 text-[13px] text-dim">
-          {pageData.total.toLocaleString("en-IN")} funds ranked by {r.label} compounded annual growth.
-          Page {pageData.page} of {pageData.totalPages}.
+        <ListingIntro paragraphs={intro} />
+        <p className="mt-2 text-[12.5px] text-faint">
+          Showing {pageData.items.length} of {pageData.total.toLocaleString("en-IN")} funds · page{" "}
+          {pageData.page} of {pageData.totalPages}
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {PERIOD_TABS.map((slug) => (
@@ -79,19 +96,25 @@ export default function RankingsPage({
                   : "border-border text-dim hover:border-accent hover:text-ink"
               }`}
             >
-              {PERIOD_LABELS[PERIOD_SLUGS[slug]]}
+              {PERIOD_LABELS[PERIOD_SLUGS[slug]]} CAGR
             </Link>
           ))}
         </div>
       </div>
 
-      <FundTable funds={pageData.items} startRank={(pageData.page - 1) * pageData.pageSize + 1} highlight={r.period} />
+      <FundTable
+        funds={pageData.items}
+        startRank={(pageData.page - 1) * pageData.pageSize + 1}
+        highlight={r.period}
+      />
 
       <Pagination
         page={pageData.page}
         totalPages={pageData.totalPages}
         buildHref={(p) => `/rankings/${params.period}${p > 1 ? `?page=${p}` : ""}`}
       />
+
+      <ListingFaq faqs={faqs} heading={`${r.label} CAGR rankings — frequently asked questions`} />
     </>
   );
 }

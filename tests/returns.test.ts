@@ -71,8 +71,67 @@ test("computeReturns nulls a horizon when history has a large gap (no absurd CAG
   }
 });
 
-test("computeReturns handles empty and malformed input", () => {
-  const r = computeReturns([]);
+test("computeReturns split-adjusts a NAV re-denomination break (no fabricated CAGR)", () => {
+  // Mirrors ICICI Overnight Fund: NAV jumps ~10x overnight on 2022-08-17 (re-denomination).
+  // The pre-break history is back-adjusted onto the latest scale, so every horizon reports
+  // the real (sane, single-digit) growth instead of a fabricated ~10x move — and none is lost.
+  const r = computeReturns([
+    { date: "15-08-2021", nav: "110.0000" }, // pre-break era (real ~110)
+    { date: "16-08-2022", nav: "116.0000" }, // last pre-break point
+    { date: "17-08-2022", nav: "1160.0000" }, // 10x overnight -> re-denomination
+    { date: "20-08-2023", nav: "1230.0000" },
+    { date: "22-08-2025", nav: "1400.0000" },
+    { date: "23-08-2026", nav: "1481.0000" }, // latest
+  ]);
+  assert.equal(r.latestNav, 1481);
+  // 5y NAV (2021) is back-adjusted 110 -> 1100, so 5y CAGR ~= (1481/1100)^(1/5)-1 ~= 6.1%.
+  assert.ok((r.cagr.y5 as number) > 0 && (r.cagr.y5 as number) < 15, "5y spans the split and is sane");
+  assert.ok((r.cagr.y3 as number) > 0 && (r.cagr.y3 as number) < 15, "3y is post-break and sane");
+  assert.ok((r.cagr.y1 as number) > 0 && (r.cagr.y1 as number) < 15, "1y is post-break and sane");
+});
+
+test("computeReturns back-adjusts a 2x split (missed by the old 3x clip)", () => {
+  // Face-value reset: NAV halves overnight on 2020-01-02. Pre-split 100 -> 200 over the
+  // prior 4y becomes 50 -> 100 on the new scale; post-split grows 100 -> 150. The full-
+  // period CAGR must be continuous (50 -> 150), not a fake -50% cliff.
+  const r = computeReturns([
+    { date: "01-01-2016", nav: "100.0000" }, // ~10y before latest
+    { date: "01-01-2018", nav: "150.0000" },
+    { date: "01-01-2020", nav: "200.0000" }, // last pre-split point
+    { date: "02-01-2020", nav: "100.0000" }, // 0.5x overnight -> split
+    { date: "01-01-2023", nav: "125.0000" },
+    { date: "01-01-2026", nav: "150.0000" }, // latest
+  ]);
+  assert.equal(r.latestNav, 150);
+  // 10y adjusted 100 -> 50, so CAGR ~= (150/50)^(1/10)-1 ~= 11.6% (positive, not a fake -50% cliff).
+  assert.ok((r.cagr.y10 as number) > 5 && (r.cagr.y10 as number) < 20, "10y spans the split and is positive");
+});
+
+test("computeReturns neutralises a split on the latest day (1-day change not fabricated)", () => {
+  // NAV halves overnight on the most recent day: the 1-day change must be ~0, not -50%.
+  const r = computeReturns([
+    { date: "01-01-2024", nav: "100.0000" },
+    { date: "28-12-2025", nav: "200.0000" }, // day before the split
+    { date: "29-12-2025", nav: "100.0000" }, // 0.5x overnight split -> latest
+  ]);
+  assert.equal(r.latestNav, 100);
+  assert.ok(Math.abs(r.today as number) < 1, "split on latest day yields ~0% 1-day change");
+});
+
+test("computeReturns cancels a transient one-day spike", () => {
+  // A single bad tick (10x up then straight back down) must not distort the series.
+  const r = computeReturns([
+    { date: "01-01-2022", nav: "100.0000" },
+    { date: "01-01-2023", nav: "110.0000" },
+    { date: "02-01-2023", nav: "1100.0000" }, // bad spike
+    { date: "03-01-2023", nav: "111.0000" }, // reverts next day
+    { date: "01-01-2024", nav: "120.0000" }, // latest
+  ]);
+  assert.equal(r.latestNav, 120);
+  assert.ok((r.cagr.y1 as number) > 0 && (r.cagr.y1 as number) < 20, "spike cancels; 1y stays sane");
+});
+
+test("computeReturns handles empty and malformed input", () => {  const r = computeReturns([]);
   assert.equal(r.latestNav, null);
   assert.equal(r.dataPoints, 0);
   const r2 = computeReturns([{ date: "bad", nav: "x" }]);
