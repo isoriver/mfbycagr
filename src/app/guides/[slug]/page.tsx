@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { GUIDES, getGuide, type Block } from "@/content/guides";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { StructuredData } from "@/components/StructuredData";
@@ -79,6 +80,40 @@ export default function GuidePage({ params }: { params: { slug: string } }) {
               </div>
             ))}
           </section>
+        )}
+
+        {g.sources && g.sources.length > 0 && (
+          <section className="mt-10 rounded-lg border border-border bg-panel p-4">
+            <h2 className="!mt-0 !text-[14px]">Sources</h2>
+            <p className="!text-[12.5px] !text-dim">
+              Rules and rates in this guide were checked against the following. Tax rules change
+              with each Union Budget — verify the current position before acting.
+            </p>
+            <ul className="!text-[12.5px]">
+              {g.sources.map((s) => (
+                <li key={s.url}>
+                  <a href={s.url} target="_blank" rel="noopener noreferrer nofollow" className="text-link hover:underline">
+                    {s.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {g.related && g.related.length > 0 && (
+          <nav aria-label="Related reading" className="mt-10 border-t border-border pt-5">
+            <h2 className="!mt-0 !text-[15px]">Related</h2>
+            <ul className="!mt-2 !list-none !pl-0">
+              {g.related.map((r) => (
+                <li key={r.href} className="!mt-1">
+                  <Link href={r.href} className="text-[13.5px] text-link hover:underline">
+                    {r.label} →
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
         )}
       </article>
     </>
