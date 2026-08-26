@@ -3,8 +3,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getAllFunds, getFundsByCategory, rankByPeriod } from "@/lib/dataset";
 import { resolveFund } from "@/lib/fund";
-import { fmtNav, fmtDate, avatarColor, avatarInitials } from "@/lib/format";
+import { getFundExtras } from "@/lib/fundExtras";
+import { fmtNav, fmtDate, fmtAum, fmtPlainPct, avatarColor, avatarInitials } from "@/lib/format";
 import { NavChart } from "@/components/NavChart";
+import { AumChart } from "@/components/AumChart";
 import { ReturnPill } from "@/components/ReturnPill";
 import { FundTable } from "@/components/FundTable";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -51,6 +53,7 @@ export default async function FundPage({ params }: { params: Params }) {
   const resolved = await resolveFund(params.schemeCode);
   if (!resolved) notFound();
   const f = resolved.summary;
+  const extras = getFundExtras(f.code);
 
   const similar = rankByPeriod(
     getFundsByCategory(f.categorySlug).filter((x) => x.code !== f.code),
@@ -126,6 +129,45 @@ export default async function FundPage({ params }: { params: Params }) {
             </p>
           </section>
         </div>
+
+        {extras && (extras.expenseRatio != null || extras.aum != null) && (
+          <section className="mt-6 rounded-lg border border-border p-4">
+            <h2 className="mb-3 text-[14px] font-semibold">Fund facts</h2>
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              {extras.expenseRatio != null && (
+                <div>
+                  <dt className="text-[12px] text-dim">Expense ratio (Direct)</dt>
+                  <dd className="mt-0.5 text-[18px] font-semibold tabular-nums">
+                    {fmtPlainPct(extras.expenseRatio)}
+                  </dd>
+                </div>
+              )}
+              {extras.aum != null && (
+                <div>
+                  <dt className="text-[12px] text-dim">
+                    AUM{extras.aumQuarter ? ` · ${extras.aumQuarter}` : ""}
+                  </dt>
+                  <dd className="mt-0.5 text-[18px] font-semibold tabular-nums">
+                    {fmtAum(extras.aum)}
+                  </dd>
+                </div>
+              )}
+            </dl>
+
+            {extras.aumHistory.length >= 2 && (
+              <div className="mt-4">
+                <h3 className="mb-1 text-[12px] font-semibold text-dim">Quarterly AUM trend</h3>
+                <AumChart points={extras.aumHistory} />
+              </div>
+            )}
+
+            <p className="mt-3 text-[11px] leading-relaxed text-faint">
+              Expense ratio (direct plan) and AUM are sourced from AMFI disclosures; AUM is the
+              scheme&apos;s quarterly average across all plans. Figures are indicative — confirm
+              against the scheme document before investing.
+            </p>
+          </section>
+        )}
 
         {similar.length > 0 && (
           <section className="mt-10">
