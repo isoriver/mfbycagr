@@ -26,7 +26,7 @@ export function Sparkline({
       <polyline
         points={coords}
         fill="none"
-        stroke={up ? "#16a34a" : "#dc2626"}
+        stroke={up ? "#137a37" : "#c81e1e"}
         strokeWidth={1.6}
         strokeLinejoin="round"
         strokeLinecap="round"

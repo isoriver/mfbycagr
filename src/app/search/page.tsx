@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { getAllFunds } from "@/lib/dataset";
-import { ReturnPill } from "@/components/ReturnPill";
+import { getAllFunds, sortFunds, parseSortKey, parseSortDir } from "@/lib/dataset";
+import { FundTable } from "@/components/FundTable";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { pageMetadata } from "@/lib/seo";
 
 export const revalidate = 86400;
 
-export function generateMetadata({ searchParams }: { searchParams: { q?: string } }): Metadata {
+const MAX_RESULTS = 100;
+
+type SearchParams = { q?: string; sort?: string; dir?: string };
+
+export function generateMetadata({ searchParams }: { searchParams: SearchParams }): Metadata {
   const q = (searchParams.q || "").trim();
   return {
     ...pageMetadata({
@@ -19,18 +22,38 @@ export function generateMetadata({ searchParams }: { searchParams: { q?: string 
   };
 }
 
-export default function SearchPage({ searchParams }: { searchParams: { q?: string } }) {
-  const q = (searchParams.q || "").trim().toLowerCase();
-  const results = q.length >= 2
-    ? getAllFunds()
-        .filter(
+export default function SearchPage({ searchParams }: { searchParams: SearchParams }) {
+  const raw = (searchParams.q || "").trim();
+  const q = raw.toLowerCase();
+
+  const matches =
+    q.length >= 2
+      ? getAllFunds().filter(
           (f) =>
             f.name.toLowerCase().includes(q) ||
             f.house.toLowerCase().includes(q) ||
-            f.category.toLowerCase().includes(q),
+            f.category.toLowerCase().includes(q) ||
+            String(f.code).includes(q),
         )
-        .slice(0, 100)
-    : [];
+      : [];
+
+  // Default ordering is relevance (name-start matches first, then 5Y CAGR), which mirrors
+  // the header dropdown. Once the reader clicks a column header we honour that instead —
+  // and we sort the full match set before slicing, so "top 100 by NAV" really is the top
+  // 100 by NAV rather than a re-shuffle of the relevance top 100.
+  const hasExplicitSort = typeof searchParams.sort === "string" && searchParams.sort !== "";
+  const sortKey = parseSortKey(searchParams.sort);
+  const sortDir = parseSortDir(searchParams.dir);
+
+  const ordered = hasExplicitSort
+    ? sortFunds(matches, sortKey, sortDir)
+    : [...matches].sort((a, b) => {
+        const aStart = a.name.toLowerCase().startsWith(q) ? 0 : 1;
+        const bStart = b.name.toLowerCase().startsWith(q) ? 0 : 1;
+        if (aStart !== bStart) return aStart - bStart;
+        return (b.y5 ?? -1e9) - (a.y5 ?? -1e9);
+      });
+  const results = ordered.slice(0, MAX_RESULTS);
 
   const crumbs = [
     { name: "Home", path: "/" },
@@ -40,32 +63,39 @@ export default function SearchPage({ searchParams }: { searchParams: { q?: strin
   return (
     <>
       <Breadcrumbs crumbs={crumbs} />
-      <div className="mx-auto max-w-content px-5 pb-10 pt-2">
+      <div className="mx-auto max-w-content px-4 pb-3 pt-2 sm:px-5">
         <h1 className="text-[24px] font-bold">
-          {q ? `Search results for “${searchParams.q}”` : "Search mutual funds"}
+          {raw ? `Search results for “${raw}”` : "Search mutual funds"}
         </h1>
-        {q && (
+        {raw && (
           <p className="mt-2 text-[13px] text-dim">
-            {results.length} {results.length === 1 ? "match" : "matches"}.
+            {matches.length.toLocaleString("en-IN")} {matches.length === 1 ? "match" : "matches"}
+            {matches.length > results.length ? ` — showing top ${results.length}` : ""} ·{" "}
+            {hasExplicitSort
+              ? `sorted by ${sortKey.toUpperCase()} ${sortDir === "desc" ? "high to low" : "low to high"}`
+              : "sorted by relevance"}
+            . Funds open in a new tab.
           </p>
         )}
-        <ul className="mt-6 divide-y divide-border">
-          {results.map((f) => (
-            <li key={f.code} className="flex items-center justify-between gap-4 py-3">
-              <Link href={`/funds/${f.code}`} className="min-w-0">
-                <span className="block truncate text-[14px] font-medium text-ink hover:text-link">{f.name}</span>
-                <span className="text-[12px] text-faint">
-                  {f.house} · {f.category}
-                </span>
-              </Link>
-              <span className="shrink-0 text-[12px] text-dim">
-                5Y <ReturnPill value={f.y5} />
-              </span>
-            </li>
-          ))}
-        </ul>
-        {q && results.length === 0 && <p className="mt-6 text-[13px] text-dim">No funds matched your search.</p>}
       </div>
+
+      {results.length > 0 ? (
+        <FundTable
+          funds={results}
+          highlight="y5"
+          openInNewTab
+          sortKey={hasExplicitSort ? sortKey : undefined}
+          sortDir={sortDir}
+          searchParams={searchParams as Record<string, string | undefined>}
+        />
+      ) : (
+        raw && (
+          <p className="mx-auto max-w-content px-4 pb-10 text-[13px] text-dim sm:px-5">
+            No funds matched “{raw}”. Try a fund house (e.g. “HDFC”) or a category (e.g. “small
+            cap”).
+          </p>
+        )
+      )}
     </>
   );
 }

@@ -38,6 +38,8 @@ export interface FundSummary {
   nav: number | null;
   navDate: string | null;
   today: number | null;
+  m1: number | null; // 1-month absolute return %
+  m6: number | null; // 6-month absolute return %
   y1: number | null;
   y3: number | null;
   y5: number | null;

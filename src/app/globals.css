@@ -28,6 +28,15 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
+/* Native disclosure menus (mobile nav): hide the default triangle marker. */
+summary {
+  list-style: none;
+  cursor: pointer;
+}
+summary::-webkit-details-marker {
+  display: none;
+}
+
 /* Prose defaults for MDX guide content */
 .prose h2 {
   font-size: 20px;

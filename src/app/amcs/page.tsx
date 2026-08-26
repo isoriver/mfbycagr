@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getHouses } from "@/lib/dataset";
+import { getAllFunds, getHouses } from "@/lib/dataset";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { StructuredData } from "@/components/StructuredData";
-import { pageMetadata, breadcrumbJsonLd } from "@/lib/seo";
+import { pageMetadata, breadcrumbJsonLd, absoluteUrl } from "@/lib/seo";
 
 export const revalidate = 86400;
 
@@ -20,13 +20,33 @@ export default function AmcsPage() {
     { name: "Home", path: "/" },
     { name: "Fund Houses", path: "/amcs" },
   ];
+  const totalFunds = getAllFunds().length;
+  const houseListJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "Indian mutual fund houses (AMCs)",
+    numberOfItems: houses.length,
+    itemListElement: houses.map((h, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: h.name,
+      url: absoluteUrl(`/amc/${h.slug}`),
+    })),
+  };
+
   return (
     <>
-      <StructuredData data={breadcrumbJsonLd(crumbs)} />
+      <StructuredData data={[breadcrumbJsonLd(crumbs), houseListJsonLd]} />
       <Breadcrumbs crumbs={crumbs} />
-      <div className="mx-auto max-w-content px-5 pb-10 pt-2">
+      <div className="mx-auto max-w-content px-4 pb-10 pt-2 sm:px-5">
         <h1 className="text-[24px] font-bold">Mutual Fund Houses (AMCs)</h1>
-        <p className="mt-2 text-[13px] text-dim">{houses.length} fund houses tracked.</p>
+        <p className="mt-2 max-w-3xl text-[13.5px] leading-relaxed text-dim">
+          An Asset Management Company (AMC) is the firm that runs a mutual fund scheme — it employs
+          the fund managers, sets the strategy and publishes the daily NAV. We track{" "}
+          {totalFunds.toLocaleString("en-IN")} direct-plan schemes across {houses.length} fund
+          houses. Open any AMC to see all of its schemes ranked by CAGR side by side, which is a
+          fairer way to judge a fund house than looking only at its best-known fund.
+        </p>
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {houses.map((h) => (
             <Link

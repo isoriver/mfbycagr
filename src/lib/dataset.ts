@@ -37,18 +37,34 @@ export function getDataset(): Dataset {
   return cached;
 }
 
+// ── Memoized derived views ──────────────────────────────────────────────────────
+// The raw dataset holds ~37k schemes. Filtering/indexing it is pure and depends only
+// on the immutable `cached` dataset, so every derived view is computed once per process
+// and reused. Without this, a single page render re-filtered all 37k records a dozen
+// times (getCategories/getHouses/getFundsBy* each called getAllFunds internally).
+let fundsCache: FundSummary[] | null = null;
+let byCodeCache: Map<number, FundSummary> | null = null;
+let byCategoryCache: Map<string, FundSummary[]> | null = null;
+let byHouseCache: Map<string, FundSummary[]> | null = null;
+let categoriesCache: CategoryInfo[] | null = null;
+let housesCache: HouseInfo[] | null = null;
+
 export function getAllFunds(): FundSummary[] {
-  return getDataset().funds.filter(
+  if (fundsCache) return fundsCache;
+  fundsCache = getDataset().funds.filter(
     (fund) =>
       hasRecentNav(fund.navDate) &&
       !EXCLUDED_CODES.has(fund.code) &&
       !isRegularPlan(fund.name),
   );
+  return fundsCache;
 }
 
 export function getFundByCode(code: number | string): FundSummary | undefined {
-  const c = Number(code);
-  return getAllFunds().find((f) => f.code === c);
+  if (!byCodeCache) {
+    byCodeCache = new Map(getAllFunds().map((f) => [f.code, f]));
+  }
+  return byCodeCache.get(Number(code));
 }
 
 export const PERIOD_LABELS: Record<Period, string> = {
@@ -77,8 +93,67 @@ export function rankByPeriod(funds: FundSummary[], period: Period): FundSummary[
   });
 }
 
-export type SortKey = "name" | "nav" | "today" | Period;
+export type SortKey = "name" | "type" | "nav" | "today" | "m1" | "m6" | Period;
 export type SortDir = "asc" | "desc";
+
+/** Every column the listing tables can be ordered by. */
+export const VALID_SORT_KEYS: SortKey[] = [
+  "name",
+  "type",
+  "nav",
+  "today",
+  "m1",
+  "m6",
+  "y1",
+  "y3",
+  "y5",
+  "y10",
+];
+
+// Shared defaults. Links that would only restate these must omit them, so the default
+// view has exactly one URL (no `?sort=y5&dir=desc` duplicate of the bare path).
+export const DEFAULT_SORT: SortKey = "y5";
+export const DEFAULT_DIR: SortDir = "desc";
+
+/**
+ * Query params the listing pages actually understand. Anything else (utm_*, fbclid, junk)
+ * is dropped when building internal links, so a single crawled tracking param can't spawn
+ * a whole sort/dir/page subtree beneath it.
+ */
+export const KNOWN_LIST_PARAMS = ["sort", "dir", "page", "type", "cat", "q"] as const;
+
+/** Resolve a raw `sort` value (SortKey or legacy period slug like "5y") to a SortKey. */
+export function parseSortKey(raw: string | string[] | undefined): SortKey {
+  if (typeof raw !== "string") return DEFAULT_SORT;
+  const mapped = PERIOD_SLUGS[raw] ?? raw;
+  return VALID_SORT_KEYS.includes(mapped as SortKey) ? (mapped as SortKey) : DEFAULT_SORT;
+}
+
+export function parseSortDir(raw: string | string[] | undefined): SortDir {
+  return raw === "asc" ? "asc" : "desc";
+}
+
+export function parsePage(raw: string | string[] | undefined): number {
+  const n = typeof raw === "string" ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+/**
+ * True when the request carries a sort/filter permutation rather than the canonical
+ * default view. Used to mark such URLs noindex so the crawl budget goes to real content.
+ */
+export function isNonCanonicalListView(
+  searchParams: Record<string, string | string[] | undefined>,
+): boolean {
+  const sort = typeof searchParams.sort === "string" ? searchParams.sort : "";
+  const dir = typeof searchParams.dir === "string" ? searchParams.dir : "";
+  const hasNonDefaultSort = sort !== "" && parseSortKey(sort) !== DEFAULT_SORT;
+  const hasNonDefaultDir = dir !== "" && parseSortDir(dir) !== DEFAULT_DIR;
+  const hasFilter = !!searchParams.type || !!searchParams.cat;
+  // Any explicitly-restated default (?sort=y5) is also a duplicate of the bare URL.
+  const restatesDefault = (sort !== "" && !hasNonDefaultSort) || (dir !== "" && !hasNonDefaultDir);
+  return hasNonDefaultSort || hasNonDefaultDir || hasFilter || restatesDefault;
+}
 
 /** Generic sort for the fund table. Nulls always go to bottom. */
 export function sortFunds(funds: FundSummary[], key: SortKey, dir: SortDir): FundSummary[] {
@@ -109,13 +184,15 @@ export const ASSET_TYPES = ["Equity", "Debt", "Hybrid", "Other", "Solution Orien
 export type AssetType = (typeof ASSET_TYPES)[number];
 
 export function getCategories(): CategoryInfo[] {
+  if (categoriesCache) return categoriesCache;
   const map = new Map<string, CategoryInfo>();
   for (const f of getAllFunds()) {
     const existing = map.get(f.categorySlug);
     if (existing) existing.count++;
     else map.set(f.categorySlug, { slug: f.categorySlug, name: f.category, type: f.type, count: 1 });
   }
-  return [...map.values()].sort((a, b) => b.count - a.count);
+  categoriesCache = [...map.values()].sort((a, b) => b.count - a.count);
+  return categoriesCache;
 }
 
 /** Subcategories (specific category names) within a given asset type. */
@@ -123,8 +200,21 @@ export function getSubcategories(type: string): CategoryInfo[] {
   return getCategories().filter((c) => c.type === type);
 }
 
+/** Look up a category by slug in O(1) — used by page metadata and headings. */
+export function getCategoryBySlug(slug: string): CategoryInfo | undefined {
+  return getCategories().find((c) => c.slug === slug);
+}
+
 export function getFundsByCategory(slug: string): FundSummary[] {
-  return getAllFunds().filter((f) => f.categorySlug === slug);
+  if (!byCategoryCache) {
+    byCategoryCache = new Map();
+    for (const f of getAllFunds()) {
+      const arr = byCategoryCache.get(f.categorySlug);
+      if (arr) arr.push(f);
+      else byCategoryCache.set(f.categorySlug, [f]);
+    }
+  }
+  return byCategoryCache.get(slug) ?? [];
 }
 
 export interface HouseInfo {
@@ -134,17 +224,32 @@ export interface HouseInfo {
 }
 
 export function getHouses(): HouseInfo[] {
+  if (housesCache) return housesCache;
   const map = new Map<string, HouseInfo>();
   for (const f of getAllFunds()) {
     const existing = map.get(f.houseSlug);
     if (existing) existing.count++;
     else map.set(f.houseSlug, { slug: f.houseSlug, name: f.house, count: 1 });
   }
-  return [...map.values()].sort((a, b) => b.count - a.count);
+  housesCache = [...map.values()].sort((a, b) => b.count - a.count);
+  return housesCache;
+}
+
+/** Look up a fund house by slug in O(1). */
+export function getHouseBySlug(slug: string): HouseInfo | undefined {
+  return getHouses().find((h) => h.slug === slug);
 }
 
 export function getFundsByHouse(slug: string): FundSummary[] {
-  return getAllFunds().filter((f) => f.houseSlug === slug);
+  if (!byHouseCache) {
+    byHouseCache = new Map();
+    for (const f of getAllFunds()) {
+      const arr = byHouseCache.get(f.houseSlug);
+      if (arr) arr.push(f);
+      else byHouseCache.set(f.houseSlug, [f]);
+    }
+  }
+  return byHouseCache.get(slug) ?? [];
 }
 
 export interface Page<T> {

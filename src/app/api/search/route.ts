@@ -12,16 +12,29 @@ export async function GET(request: Request) {
   if (q.length < 2) return NextResponse.json({ results: [] });
 
   const funds = getAllFunds();
-  const results = funds
-    .filter(
-      (f) =>
-        f.name.toLowerCase().includes(q) ||
-        f.house.toLowerCase().includes(q) ||
-        f.category.toLowerCase().includes(q) ||
-        String(f.code).includes(q),
-    )
-    .slice(0, 12)
-    .map((f) => ({ code: f.code, name: f.name, house: f.house }));
+  const matches = funds.filter(
+    (f) =>
+      f.name.toLowerCase().includes(q) ||
+      f.house.toLowerCase().includes(q) ||
+      f.category.toLowerCase().includes(q) ||
+      String(f.code).includes(q),
+  );
 
-  return NextResponse.json({ results });
+  // Rank name-start matches first so "hdfc" surfaces HDFC funds ahead of incidental hits.
+  matches.sort((a, b) => {
+    const aStarts = a.name.toLowerCase().startsWith(q) ? 0 : 1;
+    const bStarts = b.name.toLowerCase().startsWith(q) ? 0 : 1;
+    return aStarts - bStarts;
+  });
+
+  const results = matches.slice(0, 8).map((f) => ({
+    code: f.code,
+    name: f.name,
+    house: f.house,
+    category: f.category,
+    type: f.type,
+    y5: f.y5,
+  }));
+
+  return NextResponse.json({ results, total: matches.length });
 }

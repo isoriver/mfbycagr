@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
 import { getAllFunds, getCategories, getHouses, PERIOD_SLUGS } from "@/lib/dataset";
+import { getComparePairs } from "@/lib/compare";
 import { GUIDES } from "@/content/guides";
-import { SITE_URL } from "@/lib/seo";
+import { SITE_URL, fundPath } from "@/lib/seo";
 
 const FUNDS_PER_SITEMAP = 5000;
 
@@ -17,6 +18,7 @@ export default function sitemap({ id }: { id: number }): MetadataRoute.Sitemap {
   if (id === 0) {
     const staticUrls: MetadataRoute.Sitemap = [
       { url: `${SITE_URL}/`, changeFrequency: "daily", priority: 1 },
+      { url: `${SITE_URL}/rankings`, changeFrequency: "daily", priority: 0.9 },
       { url: `${SITE_URL}/categories`, changeFrequency: "weekly", priority: 0.8 },
       { url: `${SITE_URL}/amcs`, changeFrequency: "weekly", priority: 0.8 },
       { url: `${SITE_URL}/compare`, changeFrequency: "weekly", priority: 0.6 },
@@ -43,14 +45,20 @@ export default function sitemap({ id }: { id: number }): MetadataRoute.Sitemap {
       changeFrequency: "monthly" as const,
       priority: 0.6,
     }));
-    return [...staticUrls, ...rankings, ...categories, ...houses, ...guides];
+    // Prerendered head-to-head comparisons — previously absent from the sitemap entirely.
+    const compares = getComparePairs().map((p) => ({
+      url: `${SITE_URL}/compare/${p.slug}`,
+      changeFrequency: "weekly" as const,
+      priority: 0.5,
+    }));
+    return [...staticUrls, ...rankings, ...categories, ...houses, ...guides, ...compares];
   }
 
   const start = (id - 1) * FUNDS_PER_SITEMAP;
   return getAllFunds()
     .slice(start, start + FUNDS_PER_SITEMAP)
     .map((f) => ({
-      url: `${SITE_URL}/funds/${f.code}`,
+      url: `${SITE_URL}${fundPath(f)}`,
       lastModified: now,
       changeFrequency: "daily" as const,
       priority: 0.5,
