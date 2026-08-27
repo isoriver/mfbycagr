@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "test:returns": "node --test \"tests/**/*.test.ts\"",
     "build:data": "tsx scripts/build-dataset.ts",
-    "build:extras": "tsx scripts/build-extras.ts"
+    "build:extras": "tsx scripts/build-extras.ts",
+    "build:logos": "tsx scripts/build-logos.ts"
   },
   "dependencies": {
     "@next/third-parties": "^14.2.15",

@@ -19,6 +19,17 @@ Examples:
     public/logos/amc/sbi.png
     public/logos/amc/icici-prudential.svg
 
+## Automated fetch (optional)
+
+Instead of adding files by hand, you can fetch logos from a logo API:
+
+1. Get a free publishable token at https://logo.dev and set `LOGO_DEV_TOKEN` in `.env`.
+2. Check/extend the slug→domain map in `scripts/amc-domains.ts`.
+3. Run `npm run build:logos` — it writes `<slug>.png/svg` here for each mapped house.
+4. Review the results and commit the image files.
+
+(To use Brandfetch instead of Logo.dev, set `LOGO_URL_TEMPLATE` — see `.env.example`.)
+
 ## Behaviour
 
 - Any house **without** a file here keeps its coloured-initials avatar — so partial
