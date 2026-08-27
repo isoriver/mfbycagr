@@ -147,13 +147,26 @@ export function assetType(rawCategory?: string, rawType?: string, schemeName?: s
 }
 
 /**
+ * Canonical display names for houses MFapi ships with inconsistent casing/wording.
+ * Keyed by the lowercased derived name. (e.g. MFapi returns both "quant Mutual Fund"
+ * and "Quant Mutual Fund" — normalise both to "Quant". Note this must NOT catch
+ * "Quantum", which is a different AMC.)
+ */
+const CANONICAL_HOUSE: Record<string, string> = {
+  quant: "Quant",
+};
+
+/**
  * Derive the fund house / AMC from a scheme name or MFapi fund_house field.
  * Prefer the explicit fund_house; fall back to the scheme name's leading token(s).
  */
 export function deriveHouse(schemeName: string, fundHouse?: string): string {
+  let name: string;
   if (fundHouse && fundHouse.trim()) {
-    return fundHouse.replace(/Mutual Fund$/i, "").replace(/Asset Management.*/i, "").trim();
+    name = fundHouse.replace(/Mutual Fund$/i, "").replace(/Asset Management.*/i, "").trim();
+  } else {
+    // Fall back to first word of scheme name.
+    name = (schemeName.split(/\s+/)[0] || "Unknown").trim();
   }
-  // Fall back to first word of scheme name.
-  return (schemeName.split(/\s+/)[0] || "Unknown").trim();
+  return CANONICAL_HOUSE[name.toLowerCase()] ?? name;
 }

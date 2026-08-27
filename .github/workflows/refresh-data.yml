@@ -30,14 +30,24 @@ jobs:
         env:
           MF_CONCURRENCY: "8"
 
-      - name: Commit updated dataset
+      # Supplementary facts (expense ratio + AUM) from AMFI community mirrors. Runs after
+      # the dataset so it can key off the same funds; failure here must not fail the job.
+      - name: Build fund extras (expense ratio + AUM)
+        run: npm run build:extras || echo "build:extras failed; keeping previous fund-extras.json"
+
+      - name: Commit updated data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if [[ -n "$(git status --porcelain src/data/funds-summary.json)" ]]; then
-            git add src/data/funds-summary.json
-            git commit -m "chore(data): refresh fund dataset [skip ci]"
+          git add src/data/funds-summary.json src/data/fund-extras.json
+          if [[ -n "$(git status --porcelain src/data/funds-summary.json src/data/fund-extras.json)" ]]; then
+            # NOTE: do NOT add "[skip ci]" here. This workflow only runs on schedule /
+            # workflow_dispatch (never on push), so there is no re-trigger loop to guard
+            # against — and "[skip ci]" makes Vercel skip the deployment, which is exactly
+            # why fresh data never reached the live site. A plain commit lets Vercel
+            # rebuild and the homepage/tables pick up the day's NAV & returns.
+            git commit -m "chore(data): refresh fund dataset + extras"
             git push
           else
-            echo "No dataset changes."
+            echo "No data changes."
           fi

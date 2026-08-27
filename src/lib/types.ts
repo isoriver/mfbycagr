@@ -47,6 +47,34 @@ export interface FundSummary {
   spark: number[];
 }
 
+/**
+ * Supplementary per-fund facts that MFapi does not provide, sourced separately and keyed
+ * by scheme code in src/data/fund-extras.json. Kept out of FundSummary so the daily NAV
+ * refresh (which regenerates funds-summary.json) never has to carry or risk this data.
+ */
+export interface FundExtras {
+  /** Direct-plan Total Expense Ratio, % (e.g. 0.43). */
+  expenseRatio: number | null;
+  /** Scheme-level average AUM in ₹ crore. */
+  aum: number | null;
+  /** The quarter the AUM figure applies to, e.g. "April - June 2026". */
+  aumQuarter: string | null;
+  /** Accumulated quarterly AUM points (built up over time; charted once ≥2 exist). */
+  aumHistory: { quarter: string; aum: number }[];
+}
+
+export interface FundExtrasFile {
+  meta: {
+    generatedAt: string;
+    terSource: string;
+    aumSource: string;
+    aumQuarter: string | null;
+    withExpenseRatio: number;
+    withAum: number;
+  };
+  funds: Record<string, FundExtras>;
+}
+
 /** Dataset metadata written alongside the summary. */
 export interface DatasetMeta {
   generatedAt: string; // ISO timestamp

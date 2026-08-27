@@ -1,10 +1,15 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getAllFunds, getFundsByCategory, rankByPeriod } from "@/lib/dataset";
+import { getAllFunds, getFundsByCategory, getFundsByHouse, rankByPeriod } from "@/lib/dataset";
 import { resolveFund } from "@/lib/fund";
-import { fmtNav, fmtDate, avatarColor, avatarInitials } from "@/lib/format";
+import { getFundExtras } from "@/lib/fundExtras";
+import { getGrowthSibling } from "@/lib/siblings";
+import { isDistributionPlan } from "@/lib/eligibility";
+import { fmtNav, fmtDate, fmtAum, fmtPlainPct } from "@/lib/format";
 import { NavChart } from "@/components/NavChart";
+import { AumChart } from "@/components/AumChart";
+import { HouseLogo } from "@/components/HouseLogo";
 import { ReturnPill } from "@/components/ReturnPill";
 import { FundTable } from "@/components/FundTable";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -51,9 +56,29 @@ export default async function FundPage({ params }: { params: Params }) {
   const resolved = await resolveFund(params.schemeCode);
   if (!resolved) notFound();
   const f = resolved.summary;
+  const extras = getFundExtras(f.code);
+  // Payout (IDCW) plans strip income from NAV, so their CAGR understates the real return.
+  // Surface the Growth sibling's total return instead.
+  const isPayout = isDistributionPlan(f.name);
+  const growthSibling = isPayout ? getGrowthSibling(f) : null;
+
+  const GROWTH_COLS: { key: "y1" | "y3" | "y5" | "y10"; label: string }[] = [
+    { key: "y1", label: "1Y" },
+    { key: "y3", label: "3Y" },
+    { key: "y5", label: "5Y" },
+    { key: "y10", label: "10Y" },
+  ];
 
   const similar = rankByPeriod(
     getFundsByCategory(f.categorySlug).filter((x) => x.code !== f.code),
+    "y5",
+  ).slice(0, 8);
+
+  // Other funds from the same AMC — exclude this fund and the same-category funds already
+  // shown above, so the two sections don't overlap. Ranked by 5Y CAGR.
+  const similarCodes = new Set(similar.map((x) => x.code));
+  const fromHouse = rankByPeriod(
+    getFundsByHouse(f.houseSlug).filter((x) => x.code !== f.code && !similarCodes.has(x.code)),
     "y5",
   ).slice(0, 8);
 
@@ -70,13 +95,7 @@ export default async function FundPage({ params }: { params: Params }) {
 
       <article className="mx-auto max-w-content px-5 pb-10 pt-2">
         <div className="flex items-center gap-3">
-          <span
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[15px] font-bold text-white"
-            style={{ background: avatarColor(f.house) }}
-            aria-hidden="true"
-          >
-            {avatarInitials(f.house)}
-          </span>
+          <HouseLogo house={f.house} houseSlug={f.houseSlug} size={44} />
           <div>
             <h1 className="text-[22px] font-bold leading-tight">{f.name}</h1>
             <p className="mt-1 text-[12.5px] text-dim">
@@ -104,9 +123,49 @@ export default async function FundPage({ params }: { params: Params }) {
               <span className="text-[12px] text-faint">{fmtDate(f.navDate)}</span>
             </div>
             <div className="mt-1 text-[26px] font-bold tabular-nums">{fmtNav(f.nav)}</div>
+
+            {isPayout && (
+              <div className="mt-3 rounded-md border border-accent/40 bg-accent/5 p-3">
+                <p className="text-[12px] font-semibold text-ink">Payout (IDCW) plan</p>
+                {growthSibling ? (
+                  <>
+                    <p className="mt-1 text-[11.5px] leading-relaxed text-dim">
+                      This plan pays out income, so its NAV — and the CAGR below — excludes those
+                      payouts and understates your return. Total return of the Growth option (all
+                      distributions reinvested):
+                    </p>
+                    <dl className="mt-2 grid grid-cols-4 gap-1">
+                      {GROWTH_COLS.map((c) => (
+                        <div key={c.key} className="text-center">
+                          <dt className="text-[10px] uppercase tracking-wide text-faint">
+                            {c.label}
+                          </dt>
+                          <dd className="mt-0.5">
+                            <ReturnPill value={growthSibling[c.key]} />
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                    <Link
+                      href={fundPath(growthSibling)}
+                      className="mt-2 inline-block text-[12px] text-link hover:underline"
+                    >
+                      View the Growth plan →
+                    </Link>
+                  </>
+                ) : (
+                  <p className="mt-1 text-[11.5px] leading-relaxed text-dim">
+                    This plan pays out income, so the CAGR below is based on its post-payout NAV and
+                    understates your total return. A matching Growth plan wasn&apos;t found to show
+                    the reinvested total return.
+                  </p>
+                )}
+              </div>
+            )}
+
             <table className="mt-4 w-full">
               <caption className="sr-only">
-                {f.name} returns by holding period
+                {f.name} {isPayout ? "NAV-based returns (excludes payouts)" : "returns by holding period"}
               </caption>
               <tbody>
                 {ROWS.map((row) => (
@@ -122,16 +181,70 @@ export default async function FundPage({ params }: { params: Params }) {
               </tbody>
             </table>
             <p className="mt-4 text-[11px] leading-relaxed text-faint">
-              CAGR is computed from growth-plan NAV history and is not investment advice.
+              {isPayout
+                ? "The figures above come from this payout plan's own NAV, which excludes IDCW distributions — see the total-return note above. Not investment advice."
+                : "CAGR is computed from growth-plan NAV history and is not investment advice."}
             </p>
           </section>
         </div>
+
+        {extras && (extras.expenseRatio != null || extras.aum != null) && (
+          <section className="mt-6 rounded-lg border border-border p-4">
+            <h2 className="mb-3 text-[14px] font-semibold">Fund facts</h2>
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              {extras.expenseRatio != null && (
+                <div>
+                  <dt className="text-[12px] text-dim">Expense ratio (Direct)</dt>
+                  <dd className="mt-0.5 text-[18px] font-semibold tabular-nums">
+                    {fmtPlainPct(extras.expenseRatio)}
+                  </dd>
+                </div>
+              )}
+              {extras.aum != null && (
+                <div>
+                  <dt className="text-[12px] text-dim">
+                    AUM{extras.aumQuarter ? ` · ${extras.aumQuarter}` : ""}
+                  </dt>
+                  <dd className="mt-0.5 text-[18px] font-semibold tabular-nums">
+                    {fmtAum(extras.aum)}
+                  </dd>
+                </div>
+              )}
+            </dl>
+
+            {extras.aumHistory.length >= 2 && (
+              <div className="mt-4">
+                <h3 className="mb-1 text-[12px] font-semibold text-dim">Quarterly AUM trend</h3>
+                <AumChart points={extras.aumHistory} />
+              </div>
+            )}
+
+            <p className="mt-3 text-[11px] leading-relaxed text-faint">
+              Expense ratio (direct plan) and AUM are sourced from AMFI disclosures; AUM is the
+              scheme&apos;s quarterly average across all plans. Figures are indicative — confirm
+              against the scheme document before investing.
+            </p>
+          </section>
+        )}
 
         {similar.length > 0 && (
           <section className="mt-10">
             <h2 className="mb-1 text-[16px] font-semibold">Similar {f.category} funds</h2>
             <p className="mb-2 text-[12.5px] text-dim">Ranked by 5-year CAGR.</p>
             <FundTable funds={similar} highlight="y5" />
+          </section>
+        )}
+
+        {fromHouse.length > 0 && (
+          <section className="mt-10">
+            <h2 className="mb-1 text-[16px] font-semibold">More funds from {f.house}</h2>
+            <p className="mb-2 text-[12.5px] text-dim">
+              Other {f.house} schemes ranked by 5-year CAGR.{" "}
+              <Link href={`/amc/${f.houseSlug}`} className="text-link hover:underline">
+                View all {f.house} funds →
+              </Link>
+            </p>
+            <FundTable funds={fromHouse} highlight="y5" />
           </section>
         )}
       </article>

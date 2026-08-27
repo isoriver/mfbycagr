@@ -2,9 +2,10 @@ import Link from "next/link";
 import type { FundSummary, Period } from "@/lib/types";
 import type { SortKey, SortDir } from "@/lib/dataset";
 import { DEFAULT_SORT, DEFAULT_DIR, KNOWN_LIST_PARAMS } from "@/lib/dataset";
-import { fmtNav, avatarColor, avatarInitials } from "@/lib/format";
+import { fmtNav } from "@/lib/format";
 import { fundPath } from "@/lib/seo";
 import { ReturnPill } from "./ReturnPill";
+import { HouseLogo } from "./HouseLogo";
 import { Sparkline } from "./Sparkline";
 
 // Sub-year windows are simple (point-to-point) returns; yearly windows are CAGR.
@@ -158,13 +159,7 @@ export function FundTable({
               className="block rounded-lg border border-border p-3 active:bg-panel"
             >
               <div className="flex items-start gap-2.5">
-                <span
-                  className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-white"
-                  style={{ background: avatarColor(f.house) }}
-                  aria-hidden="true"
-                >
-                  {avatarInitials(f.house)}
-                </span>
+                <HouseLogo house={f.house} houseSlug={f.houseSlug} size={34} />
                 <div className="min-w-0 flex-1">
                   <span className="block text-[13px] font-medium leading-snug text-ink">
                     {f.name}
@@ -292,13 +287,7 @@ export function FundTable({
                   {...(openInNewTab ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                   className="flex items-center gap-2.5 group"
                 >
-                  <span
-                    className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-white"
-                    style={{ background: avatarColor(f.house) }}
-                    aria-hidden="true"
-                  >
-                    {avatarInitials(f.house)}
-                  </span>
+                  <HouseLogo house={f.house} houseSlug={f.houseSlug} size={30} />
                   <span className="min-w-0">
                     <span className="block text-[13px] font-medium leading-tight text-ink group-hover:text-link">
                       {f.name}

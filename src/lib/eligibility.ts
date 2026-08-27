@@ -25,6 +25,15 @@ export function isRankableName(name: string): boolean {
 }
 
 /**
+ * True for a payout plan (IDCW / dividend / payout / reinvestment / bonus). Such plans
+ * distribute income, so their NAV — and any CAGR computed from it — understates the true
+ * total return. The fund page surfaces the Growth sibling's return instead.
+ */
+export function isDistributionPlan(name: string): boolean {
+  return !!name && DISTRIBUTION_RE.test(name);
+}
+
+/**
  * Plausibility bands for annualised CAGR — a backstop against NAV-feed artefacts such as
  * a re-denomination / units break (a NAV multiplying ~10x overnight), which historically
  * produced figures like a liquid fund at "+173% 5Y" or an ultra-short fund at "+10,592% 1Y".

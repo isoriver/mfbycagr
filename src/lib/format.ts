@@ -10,6 +10,18 @@ export function fmtNav(v: number | null | undefined): string {
   return `₹${v.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/** Format an AUM figure given in ₹ crore, e.g. 96040 -> "₹96,040 Cr", 12.3 -> "₹12 Cr". */
+export function fmtAum(cr: number | null | undefined): string {
+  if (cr == null || Number.isNaN(cr)) return "—";
+  return `₹${Math.round(cr).toLocaleString("en-IN")} Cr`;
+}
+
+/** Format a plain percentage to 2dp without a sign, e.g. an expense ratio 0.43 -> "0.43%". */
+export function fmtPlainPct(v: number | null | undefined): string {
+  if (v == null || Number.isNaN(v)) return "—";
+  return `${v.toFixed(2)}%`;
+}
+
 export function fmtDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);

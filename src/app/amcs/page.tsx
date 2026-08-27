@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getAllFunds, getHouses } from "@/lib/dataset";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { StructuredData } from "@/components/StructuredData";
+import { HouseLogo } from "@/components/HouseLogo";
 import { pageMetadata, breadcrumbJsonLd, absoluteUrl } from "@/lib/seo";
 
 export const revalidate = 86400;
@@ -52,11 +53,14 @@ export default function AmcsPage() {
             <Link
               key={h.slug}
               href={`/amc/${h.slug}`}
-              className="rounded-lg border border-border p-4 transition-colors hover:border-accent"
+              className="flex items-center gap-3 rounded-lg border border-border p-4 transition-colors hover:border-accent"
             >
-              <div className="text-[14px] font-semibold text-ink">{h.name}</div>
-              <div className="mt-1 text-[12px] text-dim">
-                {h.count} {h.count === 1 ? "scheme" : "schemes"}
+              <HouseLogo house={h.name} houseSlug={h.slug} size={36} />
+              <div className="min-w-0">
+                <div className="truncate text-[14px] font-semibold text-ink">{h.name}</div>
+                <div className="mt-0.5 text-[12px] text-dim">
+                  {h.count} {h.count === 1 ? "scheme" : "schemes"}
+                </div>
               </div>
             </Link>
           ))}
