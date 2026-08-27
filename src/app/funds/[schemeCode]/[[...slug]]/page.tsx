@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getAllFunds, getFundsByCategory, rankByPeriod } from "@/lib/dataset";
+import { getAllFunds, getFundsByCategory, getFundsByHouse, rankByPeriod } from "@/lib/dataset";
 import { resolveFund } from "@/lib/fund";
 import { getFundExtras } from "@/lib/fundExtras";
 import { fmtNav, fmtDate, fmtAum, fmtPlainPct, avatarColor, avatarInitials } from "@/lib/format";
@@ -57,6 +57,14 @@ export default async function FundPage({ params }: { params: Params }) {
 
   const similar = rankByPeriod(
     getFundsByCategory(f.categorySlug).filter((x) => x.code !== f.code),
+    "y5",
+  ).slice(0, 8);
+
+  // Other funds from the same AMC — exclude this fund and the same-category funds already
+  // shown above, so the two sections don't overlap. Ranked by 5Y CAGR.
+  const similarCodes = new Set(similar.map((x) => x.code));
+  const fromHouse = rankByPeriod(
+    getFundsByHouse(f.houseSlug).filter((x) => x.code !== f.code && !similarCodes.has(x.code)),
     "y5",
   ).slice(0, 8);
 
@@ -174,6 +182,19 @@ export default async function FundPage({ params }: { params: Params }) {
             <h2 className="mb-1 text-[16px] font-semibold">Similar {f.category} funds</h2>
             <p className="mb-2 text-[12.5px] text-dim">Ranked by 5-year CAGR.</p>
             <FundTable funds={similar} highlight="y5" />
+          </section>
+        )}
+
+        {fromHouse.length > 0 && (
+          <section className="mt-10">
+            <h2 className="mb-1 text-[16px] font-semibold">More funds from {f.house}</h2>
+            <p className="mb-2 text-[12.5px] text-dim">
+              Other {f.house} schemes ranked by 5-year CAGR.{" "}
+              <Link href={`/amc/${f.houseSlug}`} className="text-link hover:underline">
+                View all {f.house} funds →
+              </Link>
+            </p>
+            <FundTable funds={fromHouse} highlight="y5" />
           </section>
         )}
       </article>
