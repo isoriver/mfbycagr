@@ -4,6 +4,8 @@ import Link from "next/link";
 import { getAllFunds, getFundsByCategory, getFundsByHouse, rankByPeriod } from "@/lib/dataset";
 import { resolveFund } from "@/lib/fund";
 import { getFundExtras } from "@/lib/fundExtras";
+import { getGrowthSibling } from "@/lib/siblings";
+import { isDistributionPlan } from "@/lib/eligibility";
 import { fmtNav, fmtDate, fmtAum, fmtPlainPct, avatarColor, avatarInitials } from "@/lib/format";
 import { NavChart } from "@/components/NavChart";
 import { AumChart } from "@/components/AumChart";
@@ -54,6 +56,17 @@ export default async function FundPage({ params }: { params: Params }) {
   if (!resolved) notFound();
   const f = resolved.summary;
   const extras = getFundExtras(f.code);
+  // Payout (IDCW) plans strip income from NAV, so their CAGR understates the real return.
+  // Surface the Growth sibling's total return instead.
+  const isPayout = isDistributionPlan(f.name);
+  const growthSibling = isPayout ? getGrowthSibling(f) : null;
+
+  const GROWTH_COLS: { key: "y1" | "y3" | "y5" | "y10"; label: string }[] = [
+    { key: "y1", label: "1Y" },
+    { key: "y3", label: "3Y" },
+    { key: "y5", label: "5Y" },
+    { key: "y10", label: "10Y" },
+  ];
 
   const similar = rankByPeriod(
     getFundsByCategory(f.categorySlug).filter((x) => x.code !== f.code),
@@ -115,9 +128,49 @@ export default async function FundPage({ params }: { params: Params }) {
               <span className="text-[12px] text-faint">{fmtDate(f.navDate)}</span>
             </div>
             <div className="mt-1 text-[26px] font-bold tabular-nums">{fmtNav(f.nav)}</div>
+
+            {isPayout && (
+              <div className="mt-3 rounded-md border border-accent/40 bg-accent/5 p-3">
+                <p className="text-[12px] font-semibold text-ink">Payout (IDCW) plan</p>
+                {growthSibling ? (
+                  <>
+                    <p className="mt-1 text-[11.5px] leading-relaxed text-dim">
+                      This plan pays out income, so its NAV — and the CAGR below — excludes those
+                      payouts and understates your return. Total return of the Growth option (all
+                      distributions reinvested):
+                    </p>
+                    <dl className="mt-2 grid grid-cols-4 gap-1">
+                      {GROWTH_COLS.map((c) => (
+                        <div key={c.key} className="text-center">
+                          <dt className="text-[10px] uppercase tracking-wide text-faint">
+                            {c.label}
+                          </dt>
+                          <dd className="mt-0.5">
+                            <ReturnPill value={growthSibling[c.key]} />
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                    <Link
+                      href={fundPath(growthSibling)}
+                      className="mt-2 inline-block text-[12px] text-link hover:underline"
+                    >
+                      View the Growth plan →
+                    </Link>
+                  </>
+                ) : (
+                  <p className="mt-1 text-[11.5px] leading-relaxed text-dim">
+                    This plan pays out income, so the CAGR below is based on its post-payout NAV and
+                    understates your total return. A matching Growth plan wasn&apos;t found to show
+                    the reinvested total return.
+                  </p>
+                )}
+              </div>
+            )}
+
             <table className="mt-4 w-full">
               <caption className="sr-only">
-                {f.name} returns by holding period
+                {f.name} {isPayout ? "NAV-based returns (excludes payouts)" : "returns by holding period"}
               </caption>
               <tbody>
                 {ROWS.map((row) => (
@@ -133,7 +186,9 @@ export default async function FundPage({ params }: { params: Params }) {
               </tbody>
             </table>
             <p className="mt-4 text-[11px] leading-relaxed text-faint">
-              CAGR is computed from growth-plan NAV history and is not investment advice.
+              {isPayout
+                ? "The figures above come from this payout plan's own NAV, which excludes IDCW distributions — see the total-return note above. Not investment advice."
+                : "CAGR is computed from growth-plan NAV history and is not investment advice."}
             </p>
           </section>
         </div>
