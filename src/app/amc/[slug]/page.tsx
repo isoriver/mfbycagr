@@ -19,6 +19,7 @@ import { FundTable } from "@/components/FundTable";
 import { Pagination } from "@/components/Pagination";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { StructuredData } from "@/components/StructuredData";
+import { HouseLogo } from "@/components/HouseLogo";
 import { ListingIntro, ListingFaq } from "@/components/ListingIntro";
 import { houseIntro, houseFaqs } from "@/content/listingCopy";
 import { listPageMetadata, breadcrumbJsonLd, itemListJsonLd, faqJsonLd } from "@/lib/seo";
@@ -107,7 +108,10 @@ export default function AmcPage({
       />
       <Breadcrumbs crumbs={crumbs} />
       <div className="mx-auto max-w-content px-4 pb-2 pt-2 sm:px-5">
-        <h1 className="text-[24px] font-bold">{name} Mutual Funds</h1>
+        <div className="flex items-center gap-3">
+          <HouseLogo house={name} houseSlug={params.slug} size={40} />
+          <h1 className="text-[24px] font-bold">{name} Mutual Funds</h1>
+        </div>
         <ListingIntro paragraphs={intro} />
         <p className="mt-2 text-[12.5px] text-faint">
           Showing {pageData.items.length} of {funds.length.toLocaleString("en-IN")} schemes · sorted

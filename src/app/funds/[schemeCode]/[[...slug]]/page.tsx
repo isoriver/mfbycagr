@@ -6,9 +6,10 @@ import { resolveFund } from "@/lib/fund";
 import { getFundExtras } from "@/lib/fundExtras";
 import { getGrowthSibling } from "@/lib/siblings";
 import { isDistributionPlan } from "@/lib/eligibility";
-import { fmtNav, fmtDate, fmtAum, fmtPlainPct, avatarColor, avatarInitials } from "@/lib/format";
+import { fmtNav, fmtDate, fmtAum, fmtPlainPct } from "@/lib/format";
 import { NavChart } from "@/components/NavChart";
 import { AumChart } from "@/components/AumChart";
+import { HouseLogo } from "@/components/HouseLogo";
 import { ReturnPill } from "@/components/ReturnPill";
 import { FundTable } from "@/components/FundTable";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -94,13 +95,7 @@ export default async function FundPage({ params }: { params: Params }) {
 
       <article className="mx-auto max-w-content px-5 pb-10 pt-2">
         <div className="flex items-center gap-3">
-          <span
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[15px] font-bold text-white"
-            style={{ background: avatarColor(f.house) }}
-            aria-hidden="true"
-          >
-            {avatarInitials(f.house)}
-          </span>
+          <HouseLogo house={f.house} houseSlug={f.houseSlug} size={44} />
           <div>
             <h1 className="text-[22px] font-bold leading-tight">{f.name}</h1>
             <p className="mt-1 text-[12.5px] text-dim">
