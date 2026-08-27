@@ -95,7 +95,7 @@ export function NavChart({
   const fmtAxisDate = (d: string) => {
     const dt = toDate(d);
     if (!dt) return "";
-    return dt.toLocaleDateString("en-IN", { month: "short", year: "2-digit", timeZone: "UTC" });
+    return dt.toLocaleDateString("en-IN", { month: "short", year: "numeric", timeZone: "UTC" });
   };
 
   // Format NAV for axis
@@ -260,18 +260,23 @@ function NavChartInteractive({
       ))}
 
       {/* X-axis labels */}
-      {xLabels.map((xl) => (
-        <text
-          key={xl.idx}
-          x={xl.x}
-          y={height - 8}
-          textAnchor="middle"
-          className="fill-gray-500"
-          fontSize={10}
-        >
-          {fmtAxisDate(xl.date)}
-        </text>
-      ))}
+      {xLabels.map((xl, i) => {
+        // Anchor the first/last labels inward so the wider "Apr 2019" text never clips
+        // against the chart edges.
+        const anchor = i === 0 ? "start" : i === xLabels.length - 1 ? "end" : "middle";
+        return (
+          <text
+            key={xl.idx}
+            x={xl.x}
+            y={height - 8}
+            textAnchor={anchor}
+            className="fill-gray-500"
+            fontSize={10}
+          >
+            {fmtAxisDate(xl.date)}
+          </text>
+        );
+      })}
 
       {/* Area fill */}
       <polygon points={area} fill={stroke} opacity={0.08} />

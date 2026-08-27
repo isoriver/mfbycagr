@@ -41,7 +41,12 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add src/data/funds-summary.json src/data/fund-extras.json
           if [[ -n "$(git status --porcelain src/data/funds-summary.json src/data/fund-extras.json)" ]]; then
-            git commit -m "chore(data): refresh fund dataset + extras [skip ci]"
+            # NOTE: do NOT add "[skip ci]" here. This workflow only runs on schedule /
+            # workflow_dispatch (never on push), so there is no re-trigger loop to guard
+            # against — and "[skip ci]" makes Vercel skip the deployment, which is exactly
+            # why fresh data never reached the live site. A plain commit lets Vercel
+            # rebuild and the homepage/tables pick up the day's NAV & returns.
+            git commit -m "chore(data): refresh fund dataset + extras"
             git push
           else
             echo "No data changes."
